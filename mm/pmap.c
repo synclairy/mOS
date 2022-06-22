@@ -4,12 +4,11 @@
 #include "env.h"
 #include "error.h"
 
-
 /* These variables are set by mips_detect_memory() */
-u_long maxpa;            /* Maximum physical address */
-u_long npage;            /* Amount of memory(in pages) */
-u_long basemem;          /* Amount of base memory(in bytes) */
-u_long extmem;           /* Amount of extended memory(in bytes) */
+u_long maxpa;			/* Maximum physical address */
+u_long npage;			/* Amount of memory(in pages) */
+u_long basemem;			/* Amount of base memory(in bytes) */
+u_long extmem;			/* Amount of extended memory(in bytes) */
 
 Pde *boot_pgdir;
 
@@ -17,7 +16,6 @@ struct Page *pages;
 static u_long freemem;
 
 static struct Page_list page_free_list;	/* Free list of physical pages */
-
 
 /* Exercise 2.1 */
 /* Overview:
@@ -32,11 +30,11 @@ void mips_detect_memory()
 	basemem = 0x04000000;
 
 	// Step 2: Calculate corresponding npage value.
-	npage = basemem >> PGSHIFT; // PGSHIFT for 4kb is 12		
+	npage = basemem >> PGSHIFT;	// PGSHIFT for 4kb is 12            
 
 	printf("Physical memory: %dK available, ", (int)(maxpa / 1024));
 	printf("base = %dK, extended = %dK\n", (int)(basemem / 1024),
-			(int)(extmem / 1024));
+	       (int)(extmem / 1024));
 }
 
 /* Overview:
@@ -54,7 +52,7 @@ static void *alloc(u_int n, u_int align, int clear)
 	/* Initialize `freemem` if this is the first time. The first virtual address that the
 	 * linker did *not* assign to any kernel code or global variables. */
 	if (freemem == 0) {
-		freemem = (u_long)end;
+		freemem = (u_long) end;
 	}
 
 	/* Step 1: Round up `freemem` up to be aligned properly */
@@ -87,7 +85,7 @@ static void *alloc(u_int n, u_int align, int clear)
    page directory `pgdir`.
    If the page table is not exist and the parameter `create` is set to 1,
    then create it.*/
-static Pte *boot_pgdir_walk(Pde *pgdir, u_long va, int create)
+static Pte *boot_pgdir_walk(Pde * pgdir, u_long va, int create)
 {
 
 	Pde *pgdir_entryp;
@@ -103,17 +101,17 @@ static Pte *boot_pgdir_walk(Pde *pgdir, u_long va, int create)
 	 * table. */
 	if ((*pgdir_entryp & PTE_V) == 0) {
 		if (create) {
-			*pgdir_entryp = PADDR(alloc(BY2PG, BY2PG, 1)); // pgdir[PDX[va]] = new alloc addr
+			*pgdir_entryp = PADDR(alloc(BY2PG, BY2PG, 1));	// pgdir[PDX[va]] = new alloc addr
 			*pgdir_entryp = (*pgdir_entryp) | PTE_V | PTE_R;
 		} else {
 			return 0;
 		}
 	}
 	/* Step 3: Get the page table entry for `va`, and return it. */
-	
-	pgtable = (Pte *)KADDR(PTE_ADDR(*pgdir_entryp)); // pgtable = pgdir[PDX[va]] -> paddr -> kva
+
+	pgtable = (Pte *) KADDR(PTE_ADDR(*pgdir_entryp));	// pgtable = pgdir[PDX[va]] -> paddr -> kva
 	pgtable_entry = pgtable + PTX(va);
-	return pgtable_entry; 
+	return pgtable_entry;
 
 }
 
@@ -125,7 +123,7 @@ static Pte *boot_pgdir_walk(Pde *pgdir, u_long va, int create)
 
   Pre-Condition:
   Size is a multiple of BY2PG.*/
-void boot_map_segment(Pde *pgdir, u_long va, u_long size, u_long pa, int perm)
+void boot_map_segment(Pde * pgdir, u_long va, u_long size, u_long pa, int perm)
 {
 	int i, va_temp;
 	Pte *pgtable_entry;
@@ -137,9 +135,8 @@ void boot_map_segment(Pde *pgdir, u_long va, u_long size, u_long pa, int perm)
 	/* Hint: Use `boot_pgdir_walk` to get the page table entry of virtual address `va`. */
 	for (i = 0; i < size; i += BY2PG) {
 		pgtable_entry = boot_pgdir_walk(pgdir, va + i, 1);
-		*pgtable_entry = PTE_ADDR(pa + i) | perm | PTE_V; // va -> addr of pgtable_entry -> set va <-> pa reflect
+		*pgtable_entry = PTE_ADDR(pa + i) | perm | PTE_V;	// va -> addr of pgtable_entry -> set va <-> pa reflect
 	}
-
 
 }
 
@@ -197,32 +194,32 @@ void page_init(void)
 
 	/* Step 2: Align `freemem` up to multiple of BY2PG. */
 	freemem = ROUND(freemem, BY2PG);
-	struct Page* now;
+	struct Page *now;
 	/* Step 3: Mark all memory blow `freemem` as used(set `pp_ref`
 	 * filed to 1) */
-	for (now = pages; page2kva(now) < freemem; now++) { //  page --> pa --> kernel va < freemem
+	for (now = pages; page2kva(now) < freemem; now++) {	//  page --> pa --> kernel va < freemem
 		now->pp_ref = 1;
 		now->isProtected = 0;
 	}
 
 	/* Step 4: Mark the other memory as free. */
-	for(now = &pages[PPN(PADDR(freemem))]; page2ppn(now) < npage; now++) { // freemem -> pa -> ppn -> pages[ppn]
+	for (now = &pages[PPN(PADDR(freemem))]; page2ppn(now) < npage; now++) {	// freemem -> pa -> ppn -> pages[ppn]
 		now->pp_ref = 0;
 		now->isProtected = 0;
 		LIST_INSERT_HEAD(&page_free_list, now, pp_link);
 	}
 	/*
-	now=pa2page(PADDR(freemem));
-	now->pp_ref = 0;
-	LIST_INSERT_HEAD(&page_free_list, now, pp_link);
-	last = now;
-	for (now++ ; page2ppn(now) < npage; now++)
-	{
-		now->pp_ref = 0;
-		LIST_INSERT_AFTER(last, now, pp_link);
-		last=now;
-	}
-	*/
+	   now=pa2page(PADDR(freemem));
+	   now->pp_ref = 0;
+	   LIST_INSERT_HEAD(&page_free_list, now, pp_link);
+	   last = now;
+	   for (now++ ; page2ppn(now) < npage; now++)
+	   {
+	   now->pp_ref = 0;
+	   LIST_INSERT_AFTER(last, now, pp_link);
+	   last=now;
+	   }
+	 */
 }
 
 /* Exercise 2.4 */
@@ -244,8 +241,8 @@ int page_alloc(struct Page **pp)
 {
 	struct Page *ppage_temp;
 
-	/* Step 1: Get a page from free memory. If fail, return the error code.*/
-	if(LIST_EMPTY(&page_free_list)) {
+	/* Step 1: Get a page from free memory. If fail, return the error code. */
+	if (LIST_EMPTY(&page_free_list)) {
 		return -E_NO_MEM;
 	}
 	ppage_temp = LIST_FIRST(&page_free_list);
@@ -281,6 +278,7 @@ void page_free(struct Page *pp)
 	 * so PANIC !!! */
 	panic("cgh:pp->pp_ref is less than zero\n");
 }
+
 /*
 int page_protect(struct Page *pp) {
 	struct Page *page_in_list;
@@ -367,9 +365,6 @@ u_long cal_page(int taskKind, u_long va, int n, Pde *pgdir)
 }
 */
 
-
-
-
 /* Exercise 2.8 */
 /*Overview:
   Given `pgdir`, a pointer to a page directory, pgdir_walk returns a pointer
@@ -387,7 +382,7 @@ Hint:
 We use a two-level pointer to store page table entry and return a state code to indicate
 whether this function execute successfully or not.
 This function has something in common with function `boot_pgdir_walk`.*/
-int pgdir_walk(Pde *pgdir, u_long va, int create, Pte **ppte)
+int pgdir_walk(Pde * pgdir, u_long va, int create, Pte ** ppte)
 {
 	Pde *pgdir_entryp;
 	Pte *pgtable;
@@ -417,7 +412,7 @@ int pgdir_walk(Pde *pgdir, u_long va, int create, Pte **ppte)
 
 	/* Step 3: Set the page table entry to `*ppte` as return value. */
 
-	*ppte = ((Pte *)(KADDR(PTE_ADDR(*pgdir_entryp)))) + PTX(va);
+	*ppte = ((Pte *) (KADDR(PTE_ADDR(*pgdir_entryp)))) + PTX(va);
 	return 0;
 }
 
@@ -433,7 +428,7 @@ int pgdir_walk(Pde *pgdir, u_long va, int create, Pte **ppte)
 Hint:
 If there is already a page mapped at `va`, call page_remove() to release this mapping.
 The `pp_ref` should be incremented if the insertion succeeds.*/
-int page_insert(Pde *pgdir, struct Page *pp, u_long va, u_int perm)
+int page_insert(Pde * pgdir, struct Page *pp, u_long va, u_int perm)
 {
 	u_int PERM;
 	Pte *pgtable_entry;
@@ -446,7 +441,7 @@ int page_insert(Pde *pgdir, struct Page *pp, u_long va, u_int perm)
 	if (pgtable_entry != 0 && (*pgtable_entry & PTE_V) != 0) {
 		if (pa2page(*pgtable_entry) != pp) {
 			page_remove(pgdir, va);
-		} else	{
+		} else {
 			tlb_invalidate(pgdir, va);
 			*pgtable_entry = (page2pa(pp) | PERM);
 			return 0;
@@ -459,7 +454,7 @@ int page_insert(Pde *pgdir, struct Page *pp, u_long va, u_int perm)
 	tlb_invalidate(pgdir, va);
 
 	/* Step 3: Do check, re-get page table entry to validate the insertion. */
-	
+
 	/* Step 3.1 Check if the page can be insert, if can't return -E_NO_MEM */
 	if ((ret = pgdir_walk(pgdir, va, 1, &pgtable_entry)) < 0) {
 		return ret;
@@ -476,7 +471,7 @@ int page_insert(Pde *pgdir, struct Page *pp, u_long va, u_int perm)
   Post-Condition:
   Return a pointer to corresponding Page, and store it's page table entry to *ppte.
   If `va` doesn't mapped to any Page, return NULL.*/
-struct Page *page_lookup(Pde *pgdir, u_long va, Pte **ppte)
+struct Page *page_lookup(Pde * pgdir, u_long va, Pte ** ppte)
 {
 	struct Page *ppage;
 	Pte *pte;
@@ -489,7 +484,7 @@ struct Page *page_lookup(Pde *pgdir, u_long va, Pte **ppte)
 		return 0;
 	}
 	if ((*pte & PTE_V) == 0) {
-		return 0;    //the page is not in memory.
+		return 0;	//the page is not in memory.
 	}
 
 	/* Step 2: Get the corresponding Page struct. */
@@ -504,16 +499,17 @@ struct Page *page_lookup(Pde *pgdir, u_long va, Pte **ppte)
 }
 
 // Overview:
-// 	Decrease the `pp_ref` value of Page `*pp`, if `pp_ref` reaches to 0, free this page.
-void page_decref(struct Page *pp) {
-	if(--pp->pp_ref == 0) {
+//      Decrease the `pp_ref` value of Page `*pp`, if `pp_ref` reaches to 0, free this page.
+void page_decref(struct Page *pp)
+{
+	if (--pp->pp_ref == 0) {
 		page_free(pp);
 	}
 }
 
 // Overview:
-// 	Unmaps the physical page at virtual address `va`.
-void page_remove(Pde *pgdir, u_long va)
+//      Unmaps the physical page at virtual address `va`.
+void page_remove(Pde * pgdir, u_long va)
 {
 	Pte *pagetable_entry;
 	struct Page *ppage;
@@ -541,8 +537,8 @@ void page_remove(Pde *pgdir, u_long va)
 }
 
 // Overview:
-// 	Update TLB.
-void tlb_invalidate(Pde *pgdir, u_long va)
+//      Update TLB.
+void tlb_invalidate(Pde * pgdir, u_long va)
 {
 	if (curenv) {
 		tlb_out(PTE_ADDR(va) | GET_ENV_ASID(curenv->env_id));
@@ -567,8 +563,6 @@ void physical_memory_manage_check(void)
 	assert(pp1 && pp1 != pp0);
 	assert(pp2 && pp2 != pp1 && pp2 != pp0);
 
-
-
 	// temporarily steal the rest of the free pages
 	fl = page_free_list;
 	// now this page_free list must be empty!!!!
@@ -576,19 +570,19 @@ void physical_memory_manage_check(void)
 	// should be no free memory
 	assert(page_alloc(&pp) == -E_NO_MEM);
 
-	temp = (int*)page2kva(pp0);
+	temp = (int *)page2kva(pp0);
 	//write 1000 to pp0
 	*temp = 1000;
 	// free pp0
 	page_free(pp0);
-	printf("The number in address temp is %d\n",*temp);
+	printf("The number in address temp is %d\n", *temp);
 
 	// alloc again
 	assert(page_alloc(&pp0) == 0);
 	assert(pp0);
 
 	// pp0 should not change
-	assert(temp == (int*)page2kva(pp0));
+	assert(temp == (int *)page2kva(pp0));
 	// pp0 should be zero
 	assert(*temp == 0);
 
@@ -598,53 +592,49 @@ void physical_memory_manage_check(void)
 	page_free(pp2);
 	struct Page_list test_free;
 	struct Page *test_pages;
-	test_pages= (struct Page *)alloc(10 * sizeof(struct Page), BY2PG, 1);
+	test_pages = (struct Page *)alloc(10 * sizeof(struct Page), BY2PG, 1);
 	LIST_INIT(&test_free);
 	//LIST_FIRST(&test_free) = &test_pages[0];
-	int i,j=0;
+	int i, j = 0;
 	struct Page *p, *q;
 	//test inert tail
-	for(i=0;i<10;i++) {
-		test_pages[i].pp_ref=i;
+	for (i = 0; i < 10; i++) {
+		test_pages[i].pp_ref = i;
 		//test_pages[i].pp_link=NULL;
 		//printf("0x%x  0x%x\n",&test_pages[i], test_pages[i].pp_link.le_next);
-		LIST_INSERT_TAIL(&test_free,&test_pages[i],pp_link);
+		LIST_INSERT_TAIL(&test_free, &test_pages[i], pp_link);
 		//printf("0x%x  0x%x\n",&test_pages[i], test_pages[i].pp_link.le_next);
 
 	}
 	p = LIST_FIRST(&test_free);
-	int answer1[]={0,1,2,3,4,5,6,7,8,9};
-	assert(p!=NULL);
-	while(p!=NULL)
-	{
+	int answer1[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+	assert(p != NULL);
+	while (p != NULL) {
 		//printf("%d %d\n",p->pp_ref,answer1[j]);
-		assert(p->pp_ref==answer1[j++]);
+		assert(p->pp_ref == answer1[j++]);
 		//printf("ptr: 0x%x v: %d\n",(p->pp_link).le_next,((p->pp_link).le_next)->pp_ref);
-		p=LIST_NEXT(p,pp_link);
+		p = LIST_NEXT(p, pp_link);
 
 	}
 	// insert_after test
-	int answer2[]={0,1,2,3,4,20,5,6,7,8,9};
-	q=(struct Page *)alloc(sizeof(struct Page), BY2PG, 1);
+	int answer2[] = { 0, 1, 2, 3, 4, 20, 5, 6, 7, 8, 9 };
+	q = (struct Page *)alloc(sizeof(struct Page), BY2PG, 1);
 	q->pp_ref = 20;
 
 	//printf("---%d\n",test_pages[4].pp_ref);
 	LIST_INSERT_AFTER(&test_pages[4], q, pp_link);
 	//printf("---%d\n",LIST_NEXT(&test_pages[4],pp_link)->pp_ref);
 	p = LIST_FIRST(&test_free);
-	j=0;
+	j = 0;
 	//printf("into test\n");
-	while(p!=NULL){
+	while (p != NULL) {
 		//      printf("%d %d\n",p->pp_ref,answer2[j]);
-		assert(p->pp_ref==answer2[j++]);
-		p=LIST_NEXT(p,pp_link);
+		assert(p->pp_ref == answer2[j++]);
+		p = LIST_NEXT(p, pp_link);
 	}
-
-
 
 	printf("physical_memory_manage_check() succeeded\n");
 }
-
 
 void page_check(void)
 {
@@ -677,8 +667,8 @@ void page_check(void)
 	assert(page_insert(boot_pgdir, pp1, 0x0, 0) == 0);
 	assert(PTE_ADDR(boot_pgdir[0]) == page2pa(pp0));
 
-	printf("va2pa(boot_pgdir, 0x0) is %x\n",va2pa(boot_pgdir, 0x0));
-	printf("page2pa(pp1) is %x\n",page2pa(pp1));
+	printf("va2pa(boot_pgdir, 0x0) is %x\n", va2pa(boot_pgdir, 0x0));
+	printf("page2pa(pp1) is %x\n", page2pa(pp1));
 
 	assert(va2pa(boot_pgdir, 0x0) == page2pa(pp1));
 	assert(pp1->pp_ref == 1);
@@ -712,7 +702,7 @@ void page_check(void)
 	assert(va2pa(boot_pgdir, BY2PG) == page2pa(pp1));
 	// ... and ref counts should reflect this
 	assert(pp1->pp_ref == 2);
-	printf("pp2->pp_ref %d\n",pp2->pp_ref);
+	printf("pp2->pp_ref %d\n", pp2->pp_ref);
 	assert(pp2->pp_ref == 0);
 	printf("end page_insert\n");
 
@@ -774,12 +764,11 @@ void pageout(int va, int context)
 	}
 
 	if ((r = page_alloc(&p)) < 0) {
-		panic ("page alloc error!");
+		panic("page alloc error!");
 	}
 
 	p->pp_ref++;
 
-	page_insert((Pde *)context, p, VA2PFN(va), PTE_R);
+	page_insert((Pde *) context, p, VA2PFN(va), PTE_R);
 	printf("pageout:\t@@@___0x%x___@@@  ins a page \n", va);
 }
-

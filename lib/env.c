@@ -7,7 +7,5 @@
 #include <pmap.h>
 #include <printf.h>
 
-struct Env *envs = NULL;		// All environments
-struct Env *curenv = NULL;	        // the current env
-
-
+struct Env *envs = NULL;	// All environments
+struct Env *curenv = NULL;	// the current env

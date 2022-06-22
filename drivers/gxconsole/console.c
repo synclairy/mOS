@@ -12,12 +12,10 @@
 	sign-extended correctly on MIPS when compiled in 64-bit mode  */
 #define	PHYSADDR_OFFSET		((signed int)0xA0000000)
 
-
 #define	PUTCHAR_ADDRESS		(PHYSADDR_OFFSET +		\
 							 DEV_CONS_ADDRESS + DEV_CONS_PUTGETCHAR)
 
 void printcharc(char ch)
 {
-	*((volatile unsigned char *) PUTCHAR_ADDRESS) = ch;
+	*((volatile unsigned char *)PUTCHAR_ADDRESS) = ch;
 }
-

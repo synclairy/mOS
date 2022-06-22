@@ -13,12 +13,12 @@ void mips_init()
 	mips_vm_init();
 	page_init();
 
-//	physical_memory_manage_check();
+//      physical_memory_manage_check();
 	page_check();
 
 	panic("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
-	while (1);
+	while (1) ;
 
 	panic("init.c:\tend of mips_init() reached!");
 }

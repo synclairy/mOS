@@ -28,11 +28,9 @@ void printf(char *fmt, ...)
 	va_end(ap);
 }
 
-void
-_panic(const char *file, int line, const char *fmt, ...)
+void _panic(const char *file, int line, const char *fmt, ...)
 {
 	va_list ap;
-
 
 	va_start(ap, fmt);
 	printf("panic at %s:%d: ", file, line);
@@ -40,6 +38,5 @@ _panic(const char *file, int line, const char *fmt, ...)
 	printf("\n");
 	va_end(ap);
 
-
-	for (;;);
+	for (;;) ;
 }
