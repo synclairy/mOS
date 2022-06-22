@@ -1,4 +1,4 @@
-# Operating-System-BUAA-2022spring
+# BUAA-OS-2022
 北航2020届计算机学院操作系统实验代码
 
 **本仓库代码在以下测试中均获得满分**
