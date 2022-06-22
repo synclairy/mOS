@@ -8,7 +8,7 @@
 - lab0-Extra（考察基础）
 - lab2-2-Extra（实现快速分配Page和页迁移）
 - lab3-1-Extra（实现信号量PV操作）
-- lab3-2-Extra（实现访存异常的handler）
+- lab3-2-Extra（实现访存异常的handler,因未考虑延迟槽，扣了1分，属于是助教手下留情）
 - lab4-1-Extra（对IPC机制进行修改使得轮询的进程可以被阻塞）
 - lab5-2-Extra（把指定文件夹下所有文件的文件名保存在一个字符串中）
 
