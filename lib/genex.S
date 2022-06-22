@@ -1,0 +1,195 @@
+#include <asm/regdef.h>
+#include <asm/cp0regdef.h>
+#include <asm/asm.h>
+#include <stackframe.h>
+
+.macro	__build_clear_sti
+	STI
+.endm
+
+.macro	__build_clear_cli
+	CLI
+.endm
+
+.macro	BUILD_HANDLER exception handler clear
+	.align	5
+	NESTED(handle_\exception, TF_SIZE, sp)  
+	.set	noat
+
+nop
+
+	SAVE_ALL				
+	__build_clear_\clear
+	.set	at
+	move	a0, sp
+	jal	\handler
+	nop
+	j	ret_from_exception
+	nop
+	END(handle_\exception)
+.endm
+
+FEXPORT(ret_from_exception)
+	.set noat
+	.set noreorder
+	RESTORE_SOME
+	.set at
+	lw	k0,TF_EPC(sp)				 
+	lw	sp,TF_REG29(sp) /* Deallocate stack */  
+//1:	j	1b
+	nop
+	jr	k0								 
+	rfe								 
+
+.align 5
+NESTED(handle_adel, TF_SIZE, sp)
+.set noat
+nop
+SAVE_ALL
+CLI
+.set at
+mfc0	t0, CP0_EPC
+lw		t7, (t0)
+srl		t1, t7, 26
+ori		t2, $0, 35
+ori 	t3, $0, 33
+ori		t4, $0, 32
+ori		t5, $0, 1
+beq		t1, t2, lwcase
+nop
+beq 	t1, t3, lhcase
+nop
+j 		rrr
+nop
+lwcase:
+sll 	t5, t5, 27
+xor		t7, t7, t5
+j rrr
+nop
+lhcase:
+sll		t5, t5, 26
+xor		t7, t7, t5
+j 		rrr
+nop
+
+rrr:
+sw		t7, (t0)
+nop
+j ret_from_exception
+nop
+END(handle_adel)
+
+.set noreorder
+.align	5
+NESTED(handle_int, TF_SIZE, sp)
+.set	noat
+
+//1: j 1b
+nop
+
+SAVE_ALL
+CLI
+.set	at
+mfc0	t0, CP0_CAUSE
+mfc0	t2, CP0_STATUS
+and	t0, t2
+
+andi	t1, t0, STATUSF_IP4
+bnez	t1, timer_irq
+nop
+END(handle_int)
+
+	.extern delay
+
+timer_irq:
+
+	sb zero, 0xb5000110			// frequency = 0
+1:	j	sched_yield				// yield
+	nop
+	/*li t1, 0xff
+	lw    t0, delay
+	addu  t0, 1
+	sw	t0, delay
+	beq	t0,t1,1f	
+	nop*/
+	j	ret_from_exception		// rfe
+	nop
+
+LEAF(do_reserved)
+END(do_reserved)
+
+	.extern tlbra
+.set	noreorder
+NESTED(do_refill,0 , sp)
+			//li	k1, '?'
+			//sb	k1, 0x90000000
+			.extern	mCONTEXT
+//this "1" is important
+1:			//j 1b
+			nop
+			lw		k1,mCONTEXT		// mCONTEXT = virtual addr of pgdir
+			and		k1,0xfffff000
+				mfc0		k0,CP0_BADVADDR		// get the missed virtual addr from BadVaddr
+				srl		k0,20
+				and		k0,0xfffffffc			// get the highest 10 bits, $k0 = PDX(pgdir) << 2
+			addu		k0,k1					// $k0 = pgtable which BadVaddr belongs
+			
+			lw		k1,0(k0)					// get the pde
+			nop									// check the PTE_V
+					move		t0,k1
+					and		t0,0x0200
+					beqz		t0,NOPAGE
+			nop
+			and		k1,0xfffff000				// $k1 = PADDR(pgtable)
+				mfc0		k0,CP0_BADVADDR		// get the middle 10 bits, $k0 = PTX(pgtable) << 2
+				srl		k0,10
+				and		k0,0xfffffffc
+				and		k0,0x00000fff
+			addu		k0,k1					// $k0 = PADDR(pte)
+
+			or		k0,0x80000000
+			lw		k1,0(k0)					// get the pte
+			nop
+					move		t0,k1			// check the PTE_V
+					and		t0,0x0200
+					beqz		t0,NOPAGE
+			nop
+			move		k0,k1
+			and		k0,0x1
+			beqz		k0,NoCOW
+			nop
+			and		k1,0xfffffbff
+NoCOW:
+			mtc0		k1,CP0_ENTRYLO0
+			nop
+			tlbwr
+
+			j		2f
+			nop
+NOPAGE:
+//3: j 3b
+nop
+			mfc0		a0,CP0_BADVADDR
+			lw		a1,mCONTEXT
+			nop
+				
+			sw	 	ra,tlbra
+			jal		pageout
+			nop
+//3: j 3b
+nop
+			lw		ra,tlbra
+			nop
+
+			j	1b
+2:			nop
+
+			jr		ra
+			nop
+END(do_refill)
+
+
+
+BUILD_HANDLER reserved do_reserved cli
+BUILD_HANDLER tlb	do_refill	cli
+BUILD_HANDLER mod	page_fault_handler cli
