@@ -8,3 +8,4 @@
 /gxemul/vmlinux
 /gxemul/fs*.img
 /fs/fsformat
+.DS_Store
